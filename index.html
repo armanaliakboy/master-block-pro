@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Master Block PRO · Forex SMC</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#111c2e;--line:#26364d;--muted:#91a4bd;--green:#18c784;--red:#ff596d;--blue:#5aa7ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#e8eef7;font:14px system-ui,Segoe UI,Arial}
+header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:20px;margin:0}header small{color:var(--muted)}main{max-width:1200px;margin:auto;padding:16px;display:grid;gap:14px}
+.controls,.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+label{display:grid;gap:5px;color:var(--muted);font-size:12px}
+input,select,button{background:#0b1525;color:#e8eef7;border:1px solid #344760;border-radius:8px;padding:10px;font:inherit}
+input{min-width:130px}button{cursor:pointer;background:#1769c2;border:0;font-weight:650}button.secondary{background:#24364e}
+#chart{height:470px;width:100%}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.metric{background:#0b1525;padding:12px;border-radius:9px;min-width:0}.metric span{display:block;color:var(--muted);font-size:11px}.metric b{display:block;font-size:17px;margin-top:5px;overflow-wrap:anywhere}
+.signal{font-weight:750}.buy{color:var(--green)}.sell{color:var(--red)}.muted{color:var(--muted)}#status{color:#f6c768;line-height:1.5}
+#events{max-height:150px;overflow:auto;color:var(--muted);font-size:12px}
+footer{color:var(--muted);font-size:12px;line-height:1.5}
+@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}#chart{height:380px}}
+</style>
+</head>
+<body>
+<header><div><h1>🚀 MASTER BLOCK PRO</h1><small>Smart Money Concepts · Forex · 5-minute setup</small></div></header>
+<main>
+<section class="controls">
+<label>Forex pair<select id="pair"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>USD/CHF</option><option>NZD/USD</option><option>XAU/USD</option></select></label>
+<label>Interval<select id="interval"><option value="5min">5 minutes</option><option value="15min">15 minutes</option><option value="1h">1 hour</option></select></label>
+<label>Twelve Data API key<input id="apiKey" type="password" placeholder="Paste API key"></label>
+<button id="load">Load live data</button><button class="secondary" id="demo">Try demo mode</button>
+</section>
+<section class="panel"><div id="status">Add your Twelve Data API key and tap “Load live data”, or use demo mode. The API key is used in this browser session only.</div></section>
+<section class="panel"><div id="chart"></div></section>
+<section class="grid">
+<div class="metric"><span>LAST SIGNAL</span><b id="signal" class="signal">—</b></div>
+<div class="metric"><span>ENTRY</span><b id="entry">—</b></div>
+<div class="metric"><span>STOP LOSS</span><b id="sl">—</b></div>
+<div class="metric"><span>TP1 · 1R</span><b id="tp1">—</b></div>
+<div class="metric"><span>TP2 / TP3</span><b id="tp23">—</b></div>
+</section>
+<section class="panel"><b>SMC structure & alerts</b><p class="muted">Signals use confirmed swing breaks (BOS/CHOCH), a simple last-opposite-candle order-block approximation, and ATR-based risk levels.</p><div id="events">No signals yet.</div><p><button class="secondary" id="notify">Enable browser notifications</button></p></section>
+<footer>Educational tool only, not financial advice. Forex data availability, delays and API limits depend on your data provider and plan. Test on demo before trading. This starter app does not connect to Tradeox or place orders.</footer>
+</main>
+<script>
+const chartEl=document.getElementById('chart');
+const chart=LightweightCharts.createChart(chartEl,{layout:{background:{color:'#111c2e'},textColor:'#d9e4f2'},grid:{vertLines:{color:'#1c2a3d'},horzLines:{color:'#1c2a3d'}},rightPriceScale:{borderColor:'#344760'},timeScale:{borderColor:'#344760',timeVisible:true},crosshair:{mode:0}});
+const candles=chart.addCandlestickSeries({upColor:'#18c784',downColor:'#ff596d',borderUpColor:'#18c784',borderDownColor:'#ff596d',wickUpColor:'#18c784',wickDownColor:'#ff596d'});
+const volume=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'',scaleMargins:{top:.85,bottom:0}});
+new ResizeObserver(()=>chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight})).observe(chartEl);
+let bars=[],timer=null,lastSignalKey='',demoMode=false;
+const $=id=>document.getElementById(id);
+function fmt(v){return Number.isFinite(v)?v.toFixed(5):'—'}
+function setStatus(s){$('status').textContent=s}
+function mockData(){let out=[],p=1.08,now=Math.floor(Date.now()/300000)*300;for(let i=260;i>=0;i--){let o=p,c=o+(Math.random()-.53)*.003,h=Math.max(o,c)+Math.random()*.001,l=Math.min(o,c)-Math.random()*.001;p=c;out.push({datetime:new Date((now-i*300)*1000).toISOString(),open:o,high:h,low:l,close:c,volume:100+Math.random()*900})}return out}
+function normalize(rows){return rows.slice().reverse().map(x=>({time:Math.floor(new Date(x.datetime.replace(' ','T')+'Z').getTime()/1000),open:+x.open,high:+x.high,low:+x.low,close:+x.close,volume:+(x.volume||0)})).filter(x=>Number.isFinite(x.time))}
+async function loadLive(){const key=$('apiKey').value.trim();if(!key){setStatus('Please enter your Twelve Data API key, or choose demo mode.');return}
+setStatus('Fetching candles…');try{const pair=$('pair').value,interval=$('interval').value;const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(pair)}&interval=${interval}&outputsize=300&apikey=${encodeURIComponent(key)}`;const r=await fetch(url);const j=await r.json();if(!r.ok||j.status==='error'||!j.values)throw Error(j.message||'Data provider did not return candles. Check API key, symbol and plan.');demoMode=false;bars=normalize(j.values);render();setStatus(`Loaded ${bars.length} candles for ${pair} (${interval}). Refreshes every 60 seconds.`);if(timer)clearInterval(timer);timer=setInterval(loadLive,60000)}catch(e){setStatus('Could not load live data: '+e.message+' Use demo mode to test the interface.');}}
+function render(){candles.setData(bars.map(({time,open,high,low,close})=>({time,open,high,low,close})));volume.setData(bars.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?'rgba(24,199,132,.35)':'rgba(255,89,109,.35)'})));chart.timeScale().fitContent();analyze()}
+function analyze(){if(bars.length<40)return;const n=bars.length,highs=bars.map(x=>x.high),lows=bars.map(x=>x.low),closes=bars.map(x=>x.close);
+const len=5;let swingH=null,swingL=null;for(let i=n-25;i<n-len;i++){let hi=true,lo=true;for(let k=1;k<=len;k++){if(highs[i]<=highs[i-k]||highs[i]<highs[i+k])hi=false;if(lows[i]>=lows[i-k]||lows[i]>lows[i+k])lo=false;}if(hi)swingH=highs[i];if(lo)swingL=lows[i]}
+const last=bars[n-1],prev=bars[n-2];const tr=[];for(let i=n-14;i<n;i++){let b=bars[i],p=bars[i-1];tr.push(Math.max(b.high-b.low,Math.abs(b.high-p.close),Math.abs(b.low-p.close)))}const atr=tr.reduce((a,b)=>a+b,0)/tr.length;
+let dir=0;if(swingH&&last.close>swingH&&prev.close<=swingH)dir=1;if(swingL&&last.close<swingL&&prev.close>=swingL)dir=-1;
+if(!dir){$('signal').textContent='WAIT';$('signal').className='signal muted';return}
+const entry=last.close, risk=atr*1.5, sl=entry-dir*risk, t1=entry+dir*risk,t2=entry+dir*risk*2,t3=entry+dir*risk*3;
+$('signal').textContent=dir===1?'BUY · BULLISH BOS':'SELL · BEARISH BOS';$('signal').className='signal '+(dir===1?'buy':'sell');$('entry').textContent=fmt(entry);$('sl').textContent=fmt(sl);$('tp1').textContent=fmt(t1);$('tp23').textContent=fmt(t2)+' / '+fmt(t3);
+const key=last.time+':'+dir;if(key!==lastSignalKey){lastSignalKey=key;const msg=`${dir===1?'BUY':'SELL'} ${$('pair').value} Entry ${fmt(entry)} SL ${fmt(sl)} TP1 ${fmt(t1)} TP2 ${fmt(t2)} TP3 ${fmt(t3)}`;$('events').innerHTML=`<div>${new Date(last.time*1000).toLocaleString()} — ${msg}</div>`+$('events').innerHTML;if(Notification.permission==='granted')new Notification('Master Block PRO',{body:msg});}
+}
+$('load').onclick=loadLive;
+$('demo').onclick=()=>{if(timer)clearInterval(timer);demoMode=true;bars=mockData();render();setStatus('Demo mode: simulated candles only. These are NOT live market prices.');};
+$('notify').onclick=async()=>{if(!('Notification'in window)){setStatus('Browser notifications are not supported.');return}let p=await Notification.requestPermission();setStatus('Notification permission: '+p)};
+</script>
+</body></html>
